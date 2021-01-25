@@ -24,6 +24,7 @@ import android.net.Uri;
 import android.os.RemoteException;
 import android.provider.Settings;
 import android.util.Log;
+import android.widget.EditText;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SdkSuppress;
@@ -40,6 +41,7 @@ import com.startup.autotrafict.Net.TaskType;
 import com.telpoo.frame.model.BaseModel;
 import com.telpoo.frame.object.BaseObject;
 
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -70,6 +72,7 @@ public class AutoView {
     boolean isFinish = false;
     boolean isLoadedData = false;
     BaseObject objectScrip = new BaseObject();
+    String message = "";
 
     int dHeight = 0;
     int dWidth = 0;
@@ -101,9 +104,24 @@ public class AutoView {
         endX = startX + 5;
     }
 
+    @After
+    public void autoFinish() {
+        Calendar calendar = Calendar.getInstance();
+        calendar.add(Calendar.MINUTE, -3);
+        SettingSupport.setEndTimeProcess(getApplicationContext(), calendar.getTimeInMillis());
+//        mDevice.pressHome();
+        Context context = getApplicationContext();
+        final Intent intent = new Intent(getApplicationContext(), MainActivity.class);
+        intent.putExtra("sms", message);
+        intent.putExtra("success", true);
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
+        if (!message.isEmpty()) context.startActivity(intent);
+        Log.d(TAG, "message: "+message);
+    }
+
     @Test
     public void runTesst() {
-        if (isFinish || SettingSupport.isStop(getApplicationContext())) {
+        if (SettingSupport.isStop(getApplicationContext())) {
             Log.d(TAG, "Kết thúc quá trình auto!");
             return;
         }
@@ -121,7 +139,7 @@ public class AutoView {
         }
 
         if (page > objectScrip.getInt(ScripObj.limit_page, 20)) {
-            oppenMainActivity("Hết số lượng trang tìm kiếm");
+            message = "Hết số lượng trang tìm kiếm";
             return;
         }
 
@@ -143,7 +161,7 @@ public class AutoView {
         switch (step) {
             case 0:
                 Log.d(TAG, "data: " + objectScrip.toJson());
-                String url = "https://www.google.com/search?q= " + objectScrip.get(ScripObj.keyword, "");
+                String url = "https://www.google.com";
                 Log.d(TAG, "open: " + url);
                 try {
                     Intent i = new Intent("android.intent.action.MAIN");
@@ -162,18 +180,43 @@ public class AutoView {
                 step = 1;
                 break;
             case 1:
+
+                try {
+                    List<UiObject2> list = mDevice.findObjects(By.clazz(EditText.class));
+                    Log.d(TAG, "list: " + list.size());
+                    for (int i = 0; i < list.size(); i++) {
+                        UiObject2 viewSearch = list.get(i);
+                        if (viewSearch.getResourceName() == null) {
+                            viewSearch.click();
+                            sleep();
+                            viewSearch.setText(objectScrip.get(ScripObj.keyword, ""));
+                            Log.d(TAG, "Nhập key");
+                            sleep();
+                            mDevice.pressEnter();
+                            step = 2;
+                            break;
+                        }
+                    }
+
+                    sleep();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                break;
+
+            case 2:
                 UiObject2 item = mDevice.findObject(By.textContains(objectScrip.get(ScripObj.domain, "")));
                 if (item != null) {
                     Log.d(TAG, "Đã tìm thấy domain: " + item.getText());
                     item.click();
-                    step = 2;
+                    step = 3;
                     break;
                 }
                 mDevice.swipe(startX, startY, endX, endX, 10);
                 Log.d(TAG, "Scroll xuống để tìm domain");
                 sleep(objectScrip.getInt(ScripObj.delay_step, 30) * 1000);
                 break;
-            case 2:
+            case 3:
                 Log.d(TAG, "Đang load site: " + objectScrip.get(ScripObj.domain, ""));
                 UiObject2 itemUrl = mDevice.findObject(By.res("com.android.chrome:id/url_bar"));
                 if (itemUrl == null) break;
@@ -197,7 +240,7 @@ public class AutoView {
                     }
                     sleep();
                     Log.d(TAG, "Thành công!");
-                    oppenMainActivitySuccess();
+                    message = "Quá trình auto kết thúc";
                     return;
                 }
                 break;
@@ -242,11 +285,10 @@ public class AutoView {
 
 
     public void getData() {
-        if (isFinish || SettingSupport.isStop(getApplicationContext())) {
+        if (SettingSupport.isStop(getApplicationContext())) {
             Log.d(TAG, "Kết thúc quá trình auto!");
             return;
         }
-        countLoadData++;
         Log.d("SonLv", "Bắt đầu lấy data");
         TaskNet taskNet = new TaskNet(new BaseModel() {
             @Override
@@ -261,12 +303,14 @@ public class AutoView {
             public void onFail(int taskType, String msg) {
                 super.onFail(taskType, msg);
                 Log.d("SonLv", "Lấy data thất bại " + msg);
-                if (countLoadData < 5) {
+                if (countLoadData < 3) {
+                    countLoadData++;
                     getData();
                     return;
                 }
-                isLoadedData = true;
-                oppenMainActivity("Không lấy được data");
+                message = msg;
+                isFinish = true;
+                SettingSupport.isStop(getContext(), true);
 
             }
         }, TaskType.TASK_TASK, getApplicationContext());
@@ -377,37 +421,6 @@ public class AutoView {
             Log.d("SonLv", "Exception: " + e.getMessage());
             Log.d("SonLv", "Có lỗi khi clear data Chrome!");
         }
-    }
-
-
-    public void oppenMainActivity(String sms) {
-        Log.d("SonLv", "sms: " + sms);
-        isFinish = true;
-
-        mDevice.pressHome();
-        // Launch the blueprint app
-        Context context = getApplicationContext();
-        final Intent intent = new Intent(getApplicationContext(), MainActivity.class);
-        intent.putExtra("sms", sms);
-        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
-        context.startActivity(intent);
-    }
-
-
-    public void oppenMainActivitySuccess() {
-        isFinish = true;
-        Calendar calendar = Calendar.getInstance();
-        calendar.add(Calendar.MINUTE, -3);
-        SettingSupport.setEndTimeProcess(getApplicationContext(), calendar.getTimeInMillis());
-        mDevice.pressHome();
-        // Launch the blueprint app
-        Context context = getApplicationContext();
-        final Intent intent = new Intent(getApplicationContext(), MainActivity.class);
-        intent.putExtra("sms", "Quá trình auto report kết thúc");
-        intent.putExtra("success", true);
-        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
-        context.startActivity(intent);
-
     }
 
 

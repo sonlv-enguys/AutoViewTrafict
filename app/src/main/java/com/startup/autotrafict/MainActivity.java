@@ -10,13 +10,14 @@ import android.app.TaskStackBuilder;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.View;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.telpoo.frame.net.BaseNetSupport;
@@ -25,7 +26,6 @@ import java.io.OutputStream;
 
 public class MainActivity extends AppCompatActivity {
 
-    View btnRunAuto, btnStopAuto, btnLogout;
     AlertDialog alertDialog;
     ProgressDialog mProgressDialog;
 
@@ -41,32 +41,6 @@ public class MainActivity extends AppCompatActivity {
         UpdateWorker.start(getApplicationContext());
         mProgressDialog = new ProgressDialog(MainActivity.this);
         mProgressDialog.setCancelable(false);
-
-        btnStopAuto = findViewById(R.id.btnStopAuto);
-        btnRunAuto = findViewById(R.id.btnRunAuto);
-        btnLogout = findViewById(R.id.btnLogout);
-
-        btnRunAuto.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                SettingSupport.isStop(MainActivity.this, false);
-                callAutolView();
-            }
-        });
-
-        btnStopAuto.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                SettingSupport.isStop(MainActivity.this, true);
-                Log.d("SonLv", "Đã dừng quá trình auto");
-            }
-        });
-        btnLogout.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                showAlertDialog("Bạn đang đăng xuất khỏi hệ thống!");
-            }
-        });
 
         setTitle(getString(R.string.app_name) + "  " + BuildConfig.VERSION_NAME);
 
@@ -127,11 +101,10 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public void showAlertDialog(String message) {
+    public void showAlertDialogLogout() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Thông báo");
-        builder.setMessage(message);
-        builder.setCancelable(false);
+        builder.setMessage("Bạn đang đăng xuất khỏi hệ thống!");
         builder.setNegativeButton("OK", new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialogInterface, int i) {
@@ -252,6 +225,34 @@ public class MainActivity extends AppCompatActivity {
         NotificationManager mNotificationManager =
                 (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         mNotificationManager.cancel(1);
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        // Inflate the menu; this adds items to the action bar if it is present.
+        getMenuInflater().inflate(R.menu.main_activity, menu);
+        return true;
+    }
+
+
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        switch (item.getItemId()) {
+            case R.id.action_run:
+                SettingSupport.isStop(MainActivity.this, false);
+                callAutolView();
+                break;
+
+            case R.id.action_stop:
+                SettingSupport.isStop(MainActivity.this, true);
+                Log.d("SonLv", "Đã dừng quá trình auto");
+                break;
+
+            case R.id.action_logout:
+                showAlertDialogLogout();
+                break;
+        }
+        return super.onOptionsItemSelected(item);
     }
 
 }
