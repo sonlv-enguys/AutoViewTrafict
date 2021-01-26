@@ -99,7 +99,7 @@ public class AutoView {
         dWidth = mDevice.getDisplayWidth();
 
         startY = dHeight / 2;
-        endY = startY + 10;
+        endY = startY + startY/3;
         startX = dWidth / 2;
         endX = startX + 5;
     }
